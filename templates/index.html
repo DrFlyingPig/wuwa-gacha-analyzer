@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鸣潮抽卡分析器</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 标题区域 -->
+        <header class="header">
+            <h1>鸣潮抽卡分析器</h1>
+            <p class="subtitle">粘贴抽卡链接，分析你的抽卡情况</p>
+        </header>
+
+        <!-- 输入区域 -->
+        <section class="input-section">
+            <div class="input-group">
+                <label for="gacha-url">抽卡记录（支持 JSON / URL / 查询参数）</label>
+                <textarea
+                    id="gacha-url"
+                    placeholder='粘贴抓包获取的内容，例如：&#10;{"playerId":"120138348","serverId":"76402e5b...","recordId":"3113aac1...","cardPoolType":1,"languageCode":"zh-Hans"}'
+                    rows="4"
+                ></textarea>
+            </div>
+            <button id="analyze-btn" class="btn-primary" onclick="analyzeGacha()">
+                <span class="btn-text">开始分析</span>
+                <span class="btn-loading" style="display:none;">分析中...</span>
+            </button>
+            <div id="error-msg" class="error-msg" style="display:none;"></div>
+        </section>
+
+        <!-- 使用说明 -->
+        <section class="help-section">
+            <h3>如何获取抽卡数据？</h3>
+            <ol>
+                <li>打开鸣潮游戏，进入<strong>唤取</strong>（抽卡）界面</li>
+                <li>点击历史记录按钮，打开抽卡历史页面</li>
+                <li>使用抓包工具（如 Fiddler、Charles）捕获网络请求</li>
+                <li>找到包含 <code>gacha/record/query</code> 的请求</li>
+                <li>复制请求体 JSON 或完整 URL 粘贴到上方输入框</li>
+            </ol>
+            <p class="help-note">支持三种格式：JSON 请求体、完整 URL、查询参数字符串</p>
+        </section>
+
+        <!-- 结果区域 -->
+        <section id="result-section" class="result-section" style="display:none;">
+            <!-- 玩家信息 -->
+            <div class="player-info card">
+                <h2>玩家信息</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">玩家ID</span>
+                        <span id="player-id" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">服务器</span>
+                        <span id="player-server" class="info-value">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 总体统计 -->
+            <div class="summary card">
+                <h2>总体统计</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-pulls">0</div>
+                        <div class="stat-label">总抽数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value five-star" id="total-five">0</div>
+                        <div class="stat-label">五星数量</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value four-star" id="total-four">0</div>
+                        <div class="stat-label">四星数量</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="avg-pulls">0</div>
+                        <div class="stat-label">五星平均抽数</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 卡池详情标签页 -->
+            <div class="pools-section card">
+                <div class="tabs">
+                    <button class="tab active" data-pool="角色UP" onclick="switchTab(this)">角色UP</button>
+                    <button class="tab" data-pool="武器UP" onclick="switchTab(this)">武器UP</button>
+                    <button class="tab" data-pool="常驻角色" onclick="switchTab(this)">常驻角色</button>
+                    <button class="tab" data-pool="常驻武器" onclick="switchTab(this)">常驻武器</button>
+                </div>
+
+                <div class="pool-content">
+                    <!-- 当前卡池统计 -->
+                    <div class="pool-stats">
+                        <div class="stat-row">
+                            <span>总抽数</span>
+                            <span id="pool-total" class="value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>当前五星保底进度</span>
+                            <span id="pool-pity5" class="value pity">0/80</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>当前四星保底进度</span>
+                            <span id="pool-pity4" class="value pity">0/10</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>五星平均抽数</span>
+                            <span id="pool-avg5" class="value">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>运气评价</span>
+                            <span id="pool-luck" class="value luck">-</span>
+                        </div>
+                        <!-- 50/50 统计（仅角色UP池显示） -->
+                        <div id="pool-5050-section" class="stat-row 5050-row" style="display:none;">
+                            <span>50/50 胜负</span>
+                            <span class="value">
+                                <span id="pool-win" class="win-tag">0胜</span>
+                                <span id="pool-lose" class="lose-tag">0负</span>
+                                <span id="pool-winrate" class="winrate-text">(0%)</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 保底进度条 -->
+                    <div class="pity-bar-section">
+                        <h3>五星保底进度</h3>
+                        <div class="pity-bar">
+                            <div class="pity-bar-fill" id="pity-bar-fill" style="width: 0%"></div>
+                            <span class="pity-bar-text" id="pity-bar-text">0/80</span>
+                        </div>
+                    </div>
+
+                    <!-- 五星记录列表 -->
+                    <div class="five-star-list">
+                        <h3>五星记录</h3>
+                        <div id="five-star-items" class="star-items">
+                            <p class="empty-msg">暂无五星记录</p>
+                        </div>
+                    </div>
+
+                    <!-- 四星记录列表 -->
+                    <div class="four-star-list">
+                        <h3>四星记录</h3>
+                        <div id="four-star-items" class="star-items">
+                            <p class="empty-msg">暂无四星记录</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图表区域 -->
+            <div class="charts-section">
+                <div class="chart-container card">
+                    <h3>各卡池抽数分布</h3>
+                    <canvas id="pool-chart"></canvas>
+                </div>
+                <div class="chart-container card">
+                    <h3>五星出货抽数分布</h3>
+                    <canvas id="pity-chart"></canvas>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
