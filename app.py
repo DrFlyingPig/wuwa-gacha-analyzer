@@ -195,7 +195,13 @@ def fetch_gacha_records(params):
     resp = requests.post(GACHA_API_URL, json=payload, headers=headers, timeout=30)
     resp.raise_for_status()
     data = resp.json()
-    # API 返回格式: {"code": 0, "data": [...]}
+
+    # 检查 API 返回状态
+    code = data.get("code", -1)
+    if code != 0:
+        message = data.get("message", "未知错误")
+        raise Exception(f"API 返回错误: {message} (code: {code})")
+
     return data.get("data", [])
 
 
@@ -345,6 +351,7 @@ def api_analyze():
 
         # 从 API 获取所有卡池的记录
         all_records = {}
+        api_errors = []
         for pool_type in POOL_TYPES:
             params_copy = params.copy()
             params_copy["card_pool_type"] = pool_type
@@ -355,7 +362,23 @@ def api_analyze():
                     save_records(player_id, server_id, records, pool_type)
                     all_records[pool_type] = records
             except Exception as e:
-                print(f"获取卡池 {pool_type} 失败: {e}")
+                error_msg = str(e)
+                print(f"获取卡池 {pool_type} 失败: {error_msg}")
+                api_errors.append(error_msg)
+
+        # 如果所有卡池都获取失败，返回错误信息
+        if not all_records and api_errors:
+            # 检查是否是 recordId 过期
+            if any("code: -1" in err for err in api_errors):
+                return jsonify({
+                    "success": False,
+                    "error": "recordId 已过期，请重新打开游戏抽卡历史页面，抓包获取新的请求数据"
+                }), 400
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": f"获取抽卡记录失败: {api_errors[0]}"
+                }), 500
 
         # 从数据库读取完整记录进行分析
         results = []
@@ -387,6 +410,13 @@ def api_analyze():
                 len(result["five_stars"])
             )
             results.append(result)
+
+        # 如果没有结果，可能是 recordId 过期且数据库为空
+        if not results:
+            return jsonify({
+                "success": False,
+                "error": "没有找到抽卡记录。如果是第一次使用，请确保 recordId 有效；如果是之前已保存过记录，请检查 playerId 是否正确"
+            }), 400
 
         summary = get_summary(results)
         total_records = get_record_count(player_id)
