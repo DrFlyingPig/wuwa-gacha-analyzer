@@ -99,6 +99,7 @@ def parse_gacha_input(input_string):
             return {
                 "serverId": params.get("serverId", ""),
                 "playerId": params.get("playerId", ""),
+                "roleId": params.get("roleId", ""),
                 "languageCode": params.get("languageCode", "zh-Hans"),
                 "recordId": params.get("recordId", ""),
             }
@@ -123,12 +124,13 @@ def parse_gacha_input(input_string):
     return {
         "serverId": get_first(["serverId", "svr_id"]),
         "playerId": get_first(["playerId", "player_id", "uid"]),
+        "roleId": get_first(["roleId", "role_id"]),
         "languageCode": get_first(["languageCode", "langCode", "lang_code", "lang"]) or "zh-Hans",
         "recordId": get_first(["recordId", "record_id", "ticket"]),
     }
 
 
-def fetch_gacha_records(server_id, player_id, language_code="zh-Hans", record_id=""):
+def fetch_gacha_records(server_id, player_id, role_id="", language_code="zh-Hans", record_id=""):
     """
     调用鸣潮 API 获取抽卡记录
     遍历所有卡池类型，获取全部记录
@@ -139,17 +141,21 @@ def fetch_gacha_records(server_id, player_id, language_code="zh-Hans", record_id
         payload = {
             "serverId": server_id,
             "playerId": player_id,
+            "roleId": role_id or player_id,
             "languageCode": language_code,
             "cardPoolType": pool_type,
             "recordId": record_id,
         }
 
         try:
+            print(f"请求卡池 {pool_type}，参数: {json.dumps(payload, ensure_ascii=False)}")
             resp = requests.post(GACHA_API_URL, json=payload, timeout=15)
+            print(f"卡池 {pool_type} HTTP 状态码: {resp.status_code}")
             data = resp.json()
+            print(f"卡池 {pool_type} 响应: {json.dumps(data, ensure_ascii=False)[:500]}")
 
-            if data.get("code") != 0:
-                print(f"卡池 {pool_type} API 返回错误: {data.get('code')}")
+            if data.get("code") != 200:
+                print(f"卡池 {pool_type} API 返回错误: code={data.get('code')}, message={data.get('message')}")
                 all_records[pool_type] = []
                 continue
 
@@ -346,16 +352,17 @@ def analyze():
     # 解析输入
     params = parse_gacha_input(url)
     if not params.get("serverId") or not params.get("playerId"):
-        return jsonify({"success": False, "error": "无法解析输入，请确认格式正确（支持JSON、URL、查询参数）"})
+        return jsonify({"success": False, "error": "无法解析输入，请确认格式正确（支持JSON、URL、查询参数）。需要提供 serverId 和 playerId 参数。"})
 
     server_id = params["serverId"]
     player_id = params["playerId"]
+    role_id = params.get("roleId", "")
     language_code = params.get("languageCode", "zh-Hans")
     record_id = params.get("recordId", "")
 
     # 获取抽卡记录
     try:
-        all_records = fetch_gacha_records(server_id, player_id, language_code, record_id)
+        all_records = fetch_gacha_records(server_id, player_id, role_id, language_code, record_id)
     except Exception as e:
         return jsonify({"success": False, "error": f"获取抽卡记录失败: {str(e)}"})
 

@@ -21,7 +21,7 @@
                 <label for="gacha-url">抽卡记录（支持 JSON / URL / 查询参数）</label>
                 <textarea
                     id="gacha-url"
-                    placeholder='粘贴抓包获取的内容，例如：&#10;{"playerId":"120138348","serverId":"76402e5b...","recordId":"3113aac1...","cardPoolType":1,"languageCode":"zh-Hans"}'
+                    placeholder='粘贴抓包获取的内容，例如：&#10;{"playerId":"120138348","roleId":"xxx","serverId":"76402e5b...","recordId":"3113aac1...","languageCode":"zh-Hans"}'
                     rows="4"
                 ></textarea>
             </div>
@@ -43,6 +43,7 @@
                 <li>复制请求体 JSON 或完整 URL 粘贴到上方输入框</li>
             </ol>
             <p class="help-note">支持三种格式：JSON 请求体、完整 URL、查询参数字符串</p>
+            <p class="help-note">必需参数：serverId、playerId、roleId（从抓包请求中获取）</p>
         </section>
 
         <!-- 结果区域 -->

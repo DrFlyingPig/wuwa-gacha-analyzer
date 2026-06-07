@@ -32,11 +32,28 @@ python app.py
 
 ## 如何获取抽卡链接
 
+### 方法一：从游戏日志获取
+
 1. 打开鸣潮游戏，进入**唤取**（抽卡）界面
 2. 点击历史记录按钮，打开抽卡历史页面
-3. 使用抓包工具（如 Fiddler、Charles、mitmproxy）捕获网络请求
-4. 找到包含 `gacha/record/query` 的请求
-5. 复制完整的请求 URL 粘贴到分析器输入框
+3. 关闭游戏
+4. 找到游戏日志文件：`%AppData%\..\Local\Wuthering Waves\Client\Saved\Logs\Client.log`
+5. 在日志中搜索 `gacha/record/query`，找到完整的请求 URL
+6. 复制 URL 粘贴到分析器输入框
+
+### 方法二：使用抓包工具
+
+1. 打开抓包工具（如 Fiddler、Charles、mitmproxy）
+2. 打开鸣潮游戏，进入**唤取**界面
+3. 点击历史记录按钮
+4. 在抓包工具中找到包含 `gacha/record/query` 的请求
+5. 复制完整的请求 URL 或 JSON 请求体
+
+### 输入格式支持
+
+- **完整 URL**: `https://gmserver-api.aki-game2.com/gacha/record/query?serverId=xxx&playerId=xxx&roleId=xxx&...`
+- **JSON 格式**: `{"serverId": "xxx", "playerId": "xxx", "roleId": "xxx", ...}`
+- **查询参数**: `serverId=xxx&playerId=xxx&roleId=xxx&...`
 
 ### 抓包工具推荐
 
